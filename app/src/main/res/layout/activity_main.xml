@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <com.faisal.wavevisualizer.WaveBarView
+    <com.faisal.wavevisualizer.WaveLineBarView
         android:id="@+id/waveform"
         android:layout_width="match_parent"
         android:layout_height="150dp"

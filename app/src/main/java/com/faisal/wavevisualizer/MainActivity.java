@@ -21,7 +21,7 @@ import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
 
 public class MainActivity extends AppCompatActivity {
-    private WaveBarView mRealtimeWaveformView;
+    private WaveLineBarView mRealtimeWaveformView;
     private RecordingThread mRecordingThread;
     private PlaybackThread mPlaybackThread;
     private static final int REQUEST_RECORD_AUDIO = 13;
@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mRealtimeWaveformView = (WaveBarView) findViewById(R.id.waveform);
+        mRealtimeWaveformView =  findViewById(R.id.waveform);
         recordButton = findViewById(R.id.btnRecord);
         playButton = findViewById(R.id.btnPlay);
         recordButton.setOnClickListener(view -> {
