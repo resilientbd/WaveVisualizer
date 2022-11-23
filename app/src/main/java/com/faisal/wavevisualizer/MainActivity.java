@@ -27,13 +27,23 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_RECORD_AUDIO = 13;
     private Button recordButton;
     private Button playButton;
+    private Button btn_Plus;
+    private Button btn_Minus;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         mRealtimeWaveformView =  findViewById(R.id.waveform);
+        btn_Minus = findViewById(R.id.btnMinus);
+        btn_Plus = findViewById(R.id.btnPlus);
         recordButton = findViewById(R.id.btnRecord);
         playButton = findViewById(R.id.btnPlay);
+        btn_Minus.setOnClickListener(view -> {
+            mRealtimeWaveformView.calibrateValueDecrement();
+        });
+        btn_Plus.setOnClickListener(view -> {
+            mRealtimeWaveformView.calibrateValueIncrement();
+        });
         recordButton.setOnClickListener(view -> {
             if (!mRecordingThread.recording()) {
                 startAudioRecordingSafe();

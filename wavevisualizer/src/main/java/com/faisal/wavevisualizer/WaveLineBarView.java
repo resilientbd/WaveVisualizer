@@ -1,9 +1,12 @@
 package com.faisal.wavevisualizer;
 
+import static java.lang.Double.max;
+
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.RectF;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -21,17 +24,25 @@ import com.faisal.wavevisualizer.utils.AudioUtils;
 import com.faisal.wavevisualizer.utils.SamplingUtils;
 import com.faisal.wavevisualizer.utils.TextUtils;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
+
+import kotlin.collections.CollectionsKt;
 
 public class WaveLineBarView extends View {
+    private int barsColor;
+    private float smoothingFactor = 0.2f;
     public static final int MODE_RECORDING = 1;
     public static final int MODE_PLAYBACK = 2;
-
+    private float[] magnitudes;
     private static final int HISTORY_SIZE = 6;
-
+    private int barsCount = 24;
     private TextPaint mTextPaint;
     private Paint mStrokePaint, mFillPaint, mMarkerPaint;
-
+    private List data;
     // Used in draw
     private int brightness;
     private Rect drawRect;
@@ -48,6 +59,8 @@ public class WaveLineBarView extends View {
     private int density = 50;
     private float gap = 4;
     private Paint middleLine;
+    private float maxMagnitude;
+    private float valueOffset = -30;
 
     public WaveLineBarView(Context context) {
         super(context);
@@ -109,65 +122,129 @@ public class WaveLineBarView extends View {
 
         middleLine = new Paint();
         middleLine.setColor(Color.BLUE);
+
+        this.magnitudes = new float[0];
+        this.data = (List)(new ArrayList());
+
+        this.maxMagnitude = this.calculateMagnitude(128.0F, 128.0F);
+        this.smoothingFactor = 0.2F;
+        this.barsCount = 24;
+        this.barsColor = Color.argb(200, 181, 111, 233);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        this.visualizeData();
+    }
+    public final void visualizeData() {
+        this.data.clear();
+        float barWidth = (float)this.getWidth() / ((float)this.barsCount * 2.0F);
+        int i = 0;
 
-        width = getMeasuredWidth();
-        height = getMeasuredHeight();
-        xStep = width / (mAudioLength * 1.0f);
-        centerY = height / 2f;
-        drawRect = new Rect(0, 0, width, height);
+        for(int var3 = this.barsCount; i < var3; ++i) {
+            float segmentSize = (float)this.magnitudes.length / (float)this.barsCount;
+            float segmentStart = (float)i * segmentSize;
+            float segmentEnd = segmentStart + segmentSize;
+            float sum = 0.0F;
+            int j = (int)segmentStart;
 
-        if (mHistoricalData != null) {
-            mHistoricalData.clear();
+            for(int var9 = (int)segmentEnd; j < var9; ++j) {
+                sum += this.magnitudes[j];
+            }
+
+
+            float horizontalOffset = sum / segmentSize;
+
+            horizontalOffset *= (float)this.getHeight();
+
+            float amp = Math.max(horizontalOffset, barWidth);
+            horizontalOffset = barWidth / (float)2;
+            float startX = barWidth * (float)i * (float)2;
+            float endX = startX + barWidth;
+            int midY = this.getHeight() / 2;
+            float startY = (float)midY - amp / (float)2;
+            float endY = (float)midY + amp / (float)2;
+            this.data.add(new RectF(startX + horizontalOffset, startY, endX + horizontalOffset, endY));
         }
-        if (mMode == MODE_PLAYBACK) {
-            createPlaybackWaveform();
+
+        this.invalidate();
+    }
+
+    private final float calculateMagnitude(float r, float i) {
+        float max;
+        if (i == 0.0F && r == 0.0F) {
+            max = 0.0F;
+        } else {
+            max = (float)10;
+            float magnitude = r * r + i * i;
+            Log.d("chkreal",""+magnitude);
+            max = magnitude;
+          //  max *= (float)Math.log10((double)magnitude);
         }
+
+        return max;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        LinkedList<float[]> temp = mHistoricalData;
-        if (mMode == MODE_RECORDING && temp != null) {
+        Iterable iterable = data;
 
-            if (mSamples != null) {
-                float barWidth = getWidth() / density;
-                float div = mSamples.length / density;
-                canvas.drawLine(0, getHeight() / 2, getWidth(), getHeight() / 2, middleLine);
-              //  paint.setStrokeWidth(barWidth - gap);
-                mStrokePaint.setStrokeWidth(barWidth - gap);
+        Iterator iterator = iterable.iterator();
 
-                for (int i = 0; i < density; i++) {
-                    int bytePosition = (int) Math.ceil(i * div);
-                  /*  int top = getHeight() +
-                            ((byte) (Math.abs(mSamples[bytePosition]) + 128)) * getHeight() / 128;*/
-                    int top = getHeight() / 2
-                            + (128 - Math.abs(mSamples[bytePosition]*(-1)))
-                            * (getHeight() / 2) / 128;
-                    int bottom = getHeight() / 2
-                            - (128 - Math.abs(mSamples[bytePosition]*(-1)))
-                            * (getHeight() / 2) / 128;
-                    float barX = (i * barWidth) + (barWidth / 2);
-                    canvas.drawLine(barX, bottom, barX, getHeight() / 2, mStrokePaint);
-                    canvas.drawLine(barX, top, barX, getHeight() / 2, mStrokePaint);
-                }
-            }
-        } else if (mMode == MODE_PLAYBACK) {
-            if (mCachedWaveform != null) {
-                canvas.drawPicture(mCachedWaveform);
-            } else if (mCachedWaveformBitmap != null) {
-                canvas.drawBitmap(mCachedWaveformBitmap, null, drawRect, null);
-            }
-            if (mMarkerPosition > -1 && mMarkerPosition < mAudioLength)
-                canvas.drawLine(xStep * mMarkerPosition, 0, xStep * mMarkerPosition, height, mMarkerPaint);
+        while(iterator.hasNext()) {
+            Object element = iterator.next();
+            RectF it = (RectF)element;
+
+            canvas.drawRoundRect(it, 25.0F, 25.0F, this.mStrokePaint);
         }
     }
+    private final float[] convertFFTtoMagnitudes(short[] fft) {
+        if (fft.length == 0) {
+            return new float[0];
+        } else {
+            int n = fft.length / 3;
+            float[] curMagnitudes = new float[n / 2];
+            float[] prevMagnitudes = this.magnitudes;
+            if (prevMagnitudes.length == 0) {
+                prevMagnitudes = new float[n];
+            }
+
+            int k = 0;
+
+            for(int var6 = n / 2 - 1; k < var6; ++k) {
+                int index = k * 2 + 2;
+                byte real = (byte) fft[index];
+                byte imaginary = (byte) fft[index + 1];
+                float curMagnitude = calculateMagnitude(real, imaginary);
+                float magn = curMagnitude + (prevMagnitudes[k] - curMagnitude) * this.smoothingFactor;
+                float per = (magn*valueOffset)/100;
+                magn = magn-per;
+                curMagnitudes[k] = magn;
+                Log.d("chkmag","mg1:"+curMagnitude);
+                Log.d("chkmag","mg2:"+magn);
+                Log.d("chkmag","offset:"+valueOffset);
+            }
+
+
+            float[] $this$mapTo$iv$iv = curMagnitudes;
+            Collection destination$iv$iv = (Collection)(new ArrayList(curMagnitudes.length));
+
+            int var21 = 0;
+
+            for(int var11 = curMagnitudes.length; var21 < var11; ++var21) {
+                float item$iv$iv = $this$mapTo$iv$iv[var21];
+
+                Float var16 = item$iv$iv / this.maxMagnitude;
+                destination$iv$iv.add(var16);
+            }
+
+            return CollectionsKt.toFloatArray((Collection)((List)destination$iv$iv));
+        }
+    }
+
 
     public int getMode() {
         return mMode;
@@ -183,8 +260,10 @@ public class WaveLineBarView extends View {
 
     public void setSamples(short[] samples) {
         mSamples = samples;
-        calculateAudioLength();
-        onSamplesChanged();
+       /* calculateAudioLength();
+        onSamplesChanged();*/
+        magnitudes = convertFFTtoMagnitudes(samples);
+        visualizeData();
     }
 
     public int getMarkerPosition() {
@@ -345,5 +424,14 @@ public class WaveLineBarView extends View {
         for (float i = 0; i <= seconds; i += secondStep) {
             canvas.drawText(String.format("%.2f", i), i * xStep, textHeight, mTextPaint);
         }
+    }
+
+    public void calibrateValueDecrement() {
+        valueOffset = valueOffset-10;
+    }
+
+    public void calibrateValueIncrement() {
+        valueOffset = valueOffset+10;
+        Log.d("chkoffset","offset:"+valueOffset);
     }
 }
