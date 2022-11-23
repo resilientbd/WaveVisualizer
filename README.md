@@ -22,7 +22,7 @@ allprojects {
  dependencies {
 
     ...
-    implementation 'com.github.resilientbd:WaveVisualizer:audioVisualizerV2'
+    implementation 'com.github.resilientbd:WaveVisualizer:1.2'
 }
 
 ```
